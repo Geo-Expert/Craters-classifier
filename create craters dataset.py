@@ -47,23 +47,23 @@ def crop_and_save_crater(map_ref, crater_id, lat, lon, diameter, offset, output_
     flipped_image = flip_crater(resized_image)
 
 
-    # plt.subplot(1, 4, 1)
-    # plt.imshow(cropped_image, cmap='gray')
-    # plt.title(f'cylindrical')
-    # plt.subplot(1, 4, 2)
-    # plt.imshow(cropped_image_projected, cmap='gray')
-    # plt.title(f'conformal')
-    # plt.subplot(1, 4, 3)
-    # plt.imshow(resized_image, cmap='gray')
-    # plt.title(f'resized')
-    # plt.subplot(1, 4, 4)
-    # plt.imshow(flipped_image, cmap='gray')
-    # plt.title(f'shadow flipped')
-    # plt.suptitle(f'diamitter:{round(diameter, 0)}, lat:{round(lat, 0)}')
-    # plt.show()
+    plt.subplot(1, 4, 1)
+    plt.imshow(cropped_image, cmap='gray')
+    plt.title(f'cylindrical')
+    plt.subplot(1, 4, 2)
+    plt.imshow(cropped_image_projected, cmap='gray')
+    plt.title(f'conformal')
+    plt.subplot(1, 4, 3)
+    plt.imshow(resized_image, cmap='gray')
+    plt.title(f'resized')
+    plt.subplot(1, 4, 4)
+    plt.imshow(flipped_image, cmap='gray')
+    plt.title(f'shadow flipped')
+    plt.suptitle(f'diamitter:{round(diameter, 0)}, lat:{round(lat, 0)}')
+    plt.show()
 
-    filename = f"{output_dir}/{crater_id}.jpeg"
-    plt.imsave(filename, resized_image, cmap='gray')
+    # filename = f"{output_dir}/{crater_id}.jpeg"
+    # plt.imsave(filename, resized_image, cmap='gray')
 
 
 def flip_crater(img):

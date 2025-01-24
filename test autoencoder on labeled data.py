@@ -47,24 +47,23 @@ if __name__ == '__main__':
     tagged_craters_array_tensor = torch.from_numpy(
         tagged_craters_array.astype(np.float32).reshape(tagged_craters_array.shape[0], 1, 100, 100))
 
-
     if autoencoder_type == 'conv':
         if bottle_neck_size == 2:
             autoencoder = ConvAutoencoder(bottleneck_size=2)
-            state_dict = torch.load("autoencoder_2.pth", weights_only=True)
+            state_dict = torch.load(os.path.join(base_dir, "autoencoder_2.pth"), weights_only=True)
             autoencoder.load_state_dict(state_dict)
         if bottle_neck_size == 6:
             autoencoder = ConvAutoencoder(bottleneck_size=6)
-            state_dict = torch.load("autoencoder_6.pth", weights_only=True)
+            state_dict = torch.load(os.path.join(base_dir, "autoencoder_6.pth"), weights_only=True)
             autoencoder.load_state_dict(state_dict)
     if autoencoder_type == 'resnet':
         if bottle_neck_size == 2:
             autoencoder = ResnetAutoencoder(bottleneck_size=2)
-            state_dict = torch.load("autoencoder_2_resnet.pth", weights_only=True)
+            state_dict = torch.load(os.path.join(base_dir, "autoencoder_2_resnet.pth"), weights_only=True)
             autoencoder.load_state_dict(state_dict)
         if bottle_neck_size == 6:
             autoencoder = ResnetAutoencoder(bottleneck_size=6)
-            state_dict = torch.load("autoencoder_6_resnet.pth", weights_only=True)
+            state_dict = torch.load(os.path.join(base_dir, "autoencoder_6_resnet.pth"), weights_only=True)
             autoencoder.load_state_dict(state_dict)
 
     autoencoder = autoencoder.to('cpu')

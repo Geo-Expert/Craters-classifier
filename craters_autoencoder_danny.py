@@ -72,36 +72,17 @@ if __name__ == '__main__':
 
     else:
         if autoencoder_type == 'conv':
-            state_dict = torch.load("autoencoder_2.pth", weights_only=True)
+            state_dict = torch.load(os.path.join(base_dir, "autoencoder_2.pth"), weights_only=True)
             autoencoder_2.load_state_dict(state_dict)
-            state_dict = torch.load("autoencoder_6.pth", weights_only=True)
+            state_dict = torch.load(os.path.join(base_dir, "autoencoder_6.pth"), weights_only=True)
             autoencoder_6.load_state_dict(state_dict)
         if autoencoder_type == 'resnet':
-            state_dict = torch.load("autoencoder_2_resnet.pth", weights_only=True)
+            state_dict = torch.load(os.path.join(base_dir, "autoencoder_2_resnet.pth"), weights_only=True)
             autoencoder_2.load_state_dict(state_dict)
-            state_dict = torch.load("autoencoder_6_resnet.pth", weights_only=True)
+            state_dict = torch.load(os.path.join(base_dir, "autoencoder_6_resnet.pth"), weights_only=True)
             autoencoder_6.load_state_dict(state_dict)
 
     craters_array_tensor = torch.from_numpy(craters_array.astype(np.float32).reshape(craters_array.shape[0], 1, img_height, img_width))
-
-    # if loss == 'mse':
-    #     criterion = MSELoss()
-    # if loss == 'ssim':
-    #     criterion = ssim_loss
-
-    # device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    # autoencoder_2.to(device)
-    # autoencoder_6.to(device)
-    # test_data = craters_array_tensor[:10000].to(device)
-    # # Perform forward pass
-    # outputs_2 = autoencoder_2(test_data)
-    # outputs_6 = autoencoder_6(test_data)
-    # # Compute the loss
-    # model_loss_2 = criterion(outputs_2, outputs_2)
-    # model_loss_6 = criterion(outputs_6, outputs_6)
-    # # Print the loss
-    # print(f'Loss autoencoder 2: {model_loss_2.item()}')
-    # print(f'Loss autoencoder 6: {model_loss_6.item()}')
 
     "test results"
 

@@ -56,6 +56,7 @@ if __name__ == '__main__':
     craters_crs = pyproj.CRS.from_wkt(craters_wkt)
     # Create a transformer for lat/lon to the map's coordinate reference system
 
+    craters_info = pd.DataFrame(columns=['id','lat', 'lon', 'x', 'y', 'diam'])
     with rasterio.open(map_file) as map_ref:
 
         transformer = pyproj.Transformer.from_crs(craters_crs, map_ref.crs.to_string(), always_xy=True)
@@ -66,16 +67,17 @@ if __name__ == '__main__':
             counter += 1
             if counter % 100 == 0:
                 print(f'processed {counter} craters')
-            crop_and_save_crater(
-                map_ref,
-                crater['CRATER_ID'],
-                crater['LAT_CIRC_IMG'],
-                crater['LON_CIRC_IMG'],
-                crater['DIAM_CIRC_IMG'],
-                offset,
-                output_dir,
-                transformer,
-                dst_height,
-                dst_width
-            )
+            lon = crater['LON_CIRC_IMG']
+            lat = crater['LAT_CIRC_IMG']
+            diam = crater['DIAM_CIRC_IMG']
+            id = crater['CRATER_ID']
+            if lon > 180:
+                lon -= 360
+            # Convert latitude and longitude to map's coordinate system
+            x, y = transformer.transform(lon, lat)
+            # Define bounding box in projected coordinates
+            diam = diam  * 1000  # Convert km to meters
+
+            craters_info.loc[len(craters_info)] = [id ,lat, lon, x, y, diam]
+    craters_info.to_csv(base_dir + "/craters_info.csv", index=False)
 

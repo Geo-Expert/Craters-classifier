@@ -9,9 +9,9 @@ if __name__ == '__main__':
 
     use_all_data = True
     sample_size = 10000
-    base_dir = "C:/Users/dannyp1801/OneDrive - Technion/Second_degree/Courses/lior's course/moon_craters"
+    base_dir = "D:/craters_classifier"
     craters_images_dataset_folder = os.path.join(base_dir, "craters_dataset")
-    output_path = "D/craters_dataset_all"
+    output_path = base_dir + "/craters_dataset_all"
 
     craters_img_paths = [os.path.join(craters_images_dataset_folder, f) for f in os.listdir(craters_images_dataset_folder)]
     print(len(craters_img_paths))

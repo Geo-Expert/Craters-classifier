@@ -7,6 +7,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import cv2
 from numpy import cos, radians
+from torchmetrics.functional import structural_similarity_index_measure as ssim
+from torch.utils.data import DataLoader, Dataset
 
 
 def crop_and_save_crater(map_ref, crater_id, lat, lon, diameter, offset, output_dir, transformer, dst_h, dst_w):
@@ -41,20 +43,20 @@ def crop_and_save_crater(map_ref, crater_id, lat, lon, diameter, offset, output_
     flipped_image = flip_crater(resized_image)
 
 
-    plt.subplot(1, 4, 1)
-    plt.imshow(cropped_image, cmap='gray')
-    plt.title(f'cylindrical')
-    plt.subplot(1, 4, 2)
-    plt.imshow(cropped_image_projected, cmap='gray')
-    plt.title(f'conformal')
-    plt.subplot(1, 4, 3)
-    plt.imshow(resized_image, cmap='gray')
-    plt.title(f'resized')
-    plt.subplot(1, 4, 4)
-    plt.imshow(flipped_image, cmap='gray')
-    plt.title(f'shadow flipped')
-    plt.suptitle(f'diamitter:{round(diameter, 0)}, lat:{round(lat, 0)}')
-    plt.show()
+    # plt.subplot(1, 4, 1)
+    # plt.imshow(cropped_image, cmap='gray')
+    # plt.title(f'cylindrical')
+    # plt.subplot(1, 4, 2)
+    # plt.imshow(cropped_image_projected, cmap='gray')
+    # plt.title(f'conformal')
+    # plt.subplot(1, 4, 3)
+    # plt.imshow(resized_image, cmap='gray')
+    # plt.title(f'resized')
+    # plt.subplot(1, 4, 4)
+    # plt.imshow(flipped_image, cmap='gray')
+    # plt.title(f'shadow flipped')
+    # plt.suptitle(f'diamitter:{round(diameter, 0)}, lat:{round(lat, 0)}')
+    # plt.show()
 
     filename = f"{output_dir}/{crater_id}.jpeg"
     plt.imsave(filename, flipped_image, cmap='gray')
@@ -78,22 +80,31 @@ def flip_crater(img):
     return img
 
 
-def train_autoencoder(autoencoder, train_loader, val_loader, epochs=10, learning_rate=0.001):
+def ssim_loss(img1, img2):
+    return 1 - ssim(img1, img2, data_range=1.0)  # SSIM values range from 0 to 1
+
+
+def train_autoencoder(autoencoder, train_loader, val_loader, epochs=10, learning_rate=0.001, loss='mse'):
     # Move model to the appropriate device
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     autoencoder.to(device)
-
+    print("moved model to ", device)
     # Loss function and optimizer
-    criterion = torch.nn.MSELoss()
+    if loss == 'mse':
+        criterion = torch.nn.MSELoss()
+    if loss == 'ssim':
+        criterion = ssim_loss
     optimizer = torch.optim.Adam(autoencoder.parameters(), lr=learning_rate)
 
     for epoch in range(epochs):
         # Training phase
+        print("start epoch ", epoch+1)
         autoencoder.train()
         train_loss = 0.0
+        batch_count = 1
         for inputs, targets in train_loader:
             inputs, targets = inputs.to(device), targets.to(device)
-
+            # print("moved train/test data to gpu")
             # Forward pass
             outputs = autoencoder(inputs)
             loss = criterion(outputs, targets)
@@ -104,24 +115,27 @@ def train_autoencoder(autoencoder, train_loader, val_loader, epochs=10, learning
             optimizer.step()
 
             train_loss += loss.item()
-
+            print("train_loss ", train_loss/batch_count, "of batch ", batch_count, "of total ", len(train_loader))
+            batch_count += 1
         # Validation phase
         autoencoder.eval()
         val_loss = 0.0
+        batch_count = 1
         with torch.no_grad():
             for inputs, targets in val_loader:
                 inputs, targets = inputs.to(device), targets.to(device)
                 outputs = autoencoder(inputs)
                 loss = criterion(outputs, targets)
                 val_loss += loss.item()
-
+                print("val_loss ", val_loss/batch_count, "of batch ", batch_count, "of total ", len(val_loader))
+                batch_count += 1
         # Log epoch statistics
         train_loss /= len(train_loader)
         val_loss /= len(val_loader)
         print(f"Epoch [{epoch + 1}/{epochs}], Train Loss: {train_loss:.4f}, Val Loss: {val_loss:.4f}")
 
+    autoencoder.to('cpu')
     return autoencoder
-
 
 
 def show_encodings(inputs, random_inputs, encoder, autoencoder):
@@ -151,11 +165,35 @@ def show_encodings(inputs, random_inputs, encoder, autoencoder):
     plt.show()
 
 
+def predict_craters(inputs, encoder, use_pca=False):
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    encoder.eval()  # Set the model to evaluation mode
+    encoder = encoder.to(device)
+    dataloader = DataLoader(inputs, batch_size=1024, shuffle=False)
+    results = []
+    count = 0
+    with torch.no_grad():  # Disable gradient computation to save memory
+        for batch in dataloader:
+            count += 1
+            print(f'predicting batch {count} out of {len(dataloader)}')
+            batch = batch.to(device)  # Move batch to GPU/CPU
+
+            outputs = encoder(batch)  # Perform inference
+            results.append(outputs.cpu())  # Move results to CPU to free GPU memory
+    final_results = torch.cat(results, dim=0)
+    coords = (final_results.detach().numpy())
+
+    if use_pca:
+        if coords.shape[1] > 2:
+            coords = (PCA(n_components=2).fit_transform(coords.reshape(len(inputs), -1)))
+    return coords
+
+
 def plot_latent(inputs, mode, technique, encoder=None, classes=None, label_dict=None):
 
     fig, ax = plt.subplots(figsize=(10, 7))
     ax.set_title(technique)
-    if technique == 'autoencoder 2' or technique == 'autoencoder 6':
+    if technique == 'autoencoder 2' or technique == 'autoencoder 6' or technique == 'autoencoder':
         coords = (encoder(inputs).detach().numpy())
         if coords.shape[1] > 2:
           coords = (PCA(n_components=2).fit_transform(coords.reshape(len(inputs), -1)))

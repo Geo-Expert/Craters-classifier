@@ -1,61 +1,107 @@
 import scipy
-import numpy as np
 import os
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import MinMaxScaler
-import torch
 from torch.utils.data import DataLoader, TensorDataset
 from functions import *
-from autoencoder import ConvAutoencoder
+from autoencoder import ConvAutoencoder, ResnetAutoencoder
+import pandas as pd
 
 
 if __name__ == '__main__':
 
     base_dir = "D:/craters_classifier"
-    crater_dataset_path = os.path.join(base_dir, "craters_dataset_10000.npy")
-    mode = 'load'   # load/train
-    craters_array = np.load(crater_dataset_path)
+    crater_dataset_path = os.path.join(base_dir, "craters_dataset_all.npy")
+    craters_info_path = os.path.join(base_dir, "craters_info.csv")
+    autoencoder_type = 'conv'  # 'conv' / 'resnet'
+    train = False  # if false, load the selected type autoencoder weights from drive
+    save = False
+    loss = 'mse'  # 'mse' / 'ssim'
+    epochs = 5
+    batch_size = 256
 
-    x_train, x_test = train_test_split(craters_array, test_size=0.2)
+    print("Loading craters data")
+    craters_array = np.load(crater_dataset_path)
+    craters_info = pd.read_csv(craters_info_path)
+    print(craters_array.shape)
+
+    img_width, img_height = int(np.sqrt(craters_array.shape[1])), int(np.sqrt(craters_array.shape[1]))
 
     scaler = MinMaxScaler()
-    x_train = scaler.fit_transform(x_train)
-    x_test = scaler.fit_transform(x_test)
+    craters_array = scaler.fit_transform(craters_array)
+    craters_array = craters_array.reshape(craters_array.shape[0], img_height, img_width, 1)
 
-    x_train = x_train.reshape(x_train.shape[0], 100, 100, 1)
-    x_test = x_test.reshape(x_test.shape[0], 100, 100, 1)
+    indices = np.arange(craters_array.shape[0])
+    np.random.shuffle(indices)
+    craters_array[:] = craters_array[indices]
 
+    # fig, ax = plt.subplots(1, 10, figsize=(20, 2))
     # for i in range(10):
-    #     plt.subplot(1, 10, i+1)
-    #     plt.imshow(x_train[i], cmap='gray')
+    #     ax[i].imshow(craters_array[i], cmap='gray')
+    #     ax[i].axis('off')
     # plt.show()
 
-    "auto encoder training"
-    #Training Loop
-    x_train_tensor = torch.from_numpy(x_train.astype(np.float32).reshape(x_train.shape[0], 1, 100, 100))
-    x_test_tensor = torch.from_numpy(x_test.astype(np.float32).reshape(x_test.shape[0], 1, 100, 100))
-    train_dataset = TensorDataset(x_train_tensor, x_train_tensor)  # Input and target are the same for autoencoder
-    val_dataset = TensorDataset(x_test_tensor, x_test_tensor)
-    # Create DataLoader for batching and shuffling
-    batch_size = 64
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
+    if autoencoder_type == 'conv':
+        autoencoder_2 = ConvAutoencoder(bottleneck_size=2)
+        autoencoder_6 = ConvAutoencoder(bottleneck_size=6)
+    if autoencoder_type == 'resnet':
+        autoencoder_2 = ResnetAutoencoder(bottleneck_size=2)
+        autoencoder_6 = ResnetAutoencoder(bottleneck_size=6)
 
-    autoencoder_2 = ConvAutoencoder(bottleneck_size=2)
-    if mode == 'train':
-        autoencoder_2 = train_autoencoder(autoencoder_2, train_loader, val_loader, epochs=2, learning_rate=0.001)
-        torch.save(autoencoder_2.state_dict(), "autoencoder_2.pth")
-    else:
-        state_dict = torch.load("autoencoder_2.pth", weights_only=True)
-        autoencoder_2.load_state_dict(state_dict)
+    if train:
+        "auto encoder training"
+        train_data, val_data = train_test_split(craters_array, test_size=0.2)
+        train_data_tensor = torch.from_numpy(train_data.astype(np.float32).reshape(train_data.shape[0], 1, img_height, img_width))
+        val_data_tensor = torch.from_numpy(val_data.astype(np.float32).reshape(val_data.shape[0], 1, img_height, img_width))
+        train_dataset = TensorDataset(train_data_tensor, train_data_tensor)
+        val_dataset = TensorDataset(val_data_tensor, val_data_tensor)
+        train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+        val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
 
-    autoencoder_6 = ConvAutoencoder(bottleneck_size=6)
-    if mode == 'train':
-        trained_autoencoder_6 = train_autoencoder(autoencoder_6, train_loader, val_loader, epochs=2, learning_rate=0.001)
-        torch.save(autoencoder_6.state_dict(), "autoencoder_6.pth")
+        autoencoder_2 = train_autoencoder(autoencoder_2, train_loader, val_loader, epochs=epochs, learning_rate=0.001, loss=loss)
+
+        autoencoder_6 = train_autoencoder(autoencoder_6, train_loader, val_loader, epochs=epochs, learning_rate=0.001, loss=loss)
+
+        if save:
+            if autoencoder_type == 'conv':
+                torch.save(autoencoder_2.state_dict(), "autoencoder_2.pth")
+                torch.save(autoencoder_6.state_dict(), "autoencoder_6.pth")
+            if autoencoder_type == 'resnet':
+                torch.save(autoencoder_2.state_dict(), "autoencoder_2_resnet.pth")
+                torch.save(autoencoder_6.state_dict(), "autoencoder_6_resnet.pth")
+
     else:
-        state_dict = torch.load("autoencoder_6.pth", weights_only=True)
-        autoencoder_6.load_state_dict(state_dict)
+        if autoencoder_type == 'conv':
+            state_dict = torch.load("autoencoder_2.pth", weights_only=True)
+            autoencoder_2.load_state_dict(state_dict)
+            state_dict = torch.load("autoencoder_6.pth", weights_only=True)
+            autoencoder_6.load_state_dict(state_dict)
+        if autoencoder_type == 'resnet':
+            state_dict = torch.load("autoencoder_2_resnet.pth", weights_only=True)
+            autoencoder_2.load_state_dict(state_dict)
+            state_dict = torch.load("autoencoder_6_resnet.pth", weights_only=True)
+            autoencoder_6.load_state_dict(state_dict)
+
+    craters_array_tensor = torch.from_numpy(craters_array.astype(np.float32).reshape(craters_array.shape[0], 1, img_height, img_width))
+
+    # if loss == 'mse':
+    #     criterion = MSELoss()
+    # if loss == 'ssim':
+    #     criterion = ssim_loss
+
+    # device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    # autoencoder_2.to(device)
+    # autoencoder_6.to(device)
+    # test_data = craters_array_tensor[:10000].to(device)
+    # # Perform forward pass
+    # outputs_2 = autoencoder_2(test_data)
+    # outputs_6 = autoencoder_6(test_data)
+    # # Compute the loss
+    # model_loss_2 = criterion(outputs_2, outputs_2)
+    # model_loss_6 = criterion(outputs_6, outputs_6)
+    # # Print the loss
+    # print(f'Loss autoencoder 2: {model_loss_2.item()}')
+    # print(f'Loss autoencoder 6: {model_loss_6.item()}')
 
     "test results"
 
@@ -63,18 +109,20 @@ if __name__ == '__main__':
     random_inputs = scipy.ndimage.zoom(random_inputs, (1, 10, 10, 1))
     random_inputs_tensor = torch.from_numpy(random_inputs.astype(np.float32).reshape(random_inputs.shape[0], 1, 100, 100))
 
-    show_encodings(x_test_tensor[:10], random_inputs_tensor, autoencoder_2.encoder, autoencoder_2)
-    show_encodings(x_test_tensor[:10], random_inputs_tensor, autoencoder_6.encoder, autoencoder_6)
+    show_encodings(craters_array_tensor[:10], random_inputs_tensor, autoencoder_2.encoder, autoencoder_2)
+    show_encodings(craters_array_tensor[:10], random_inputs_tensor, autoencoder_6.encoder, autoencoder_6)
 
-    plot_latent(x_test_tensor[:300], 'dots', 'autoencoder 2', autoencoder_2.encoder)
-    plot_latent(x_test_tensor[:300], 'dots', 'autoencoder 6', autoencoder_6.encoder)
-    plot_latent(x_test_tensor[:300], 'dots', 'pca')
-    plot_latent(x_test_tensor[:300], 'dots', 'tsne')
+    plot_latent(craters_array_tensor[:300], 'dots', 'autoencoder 2', autoencoder_2.encoder)
+    plot_latent(craters_array_tensor[:300], 'dots', 'autoencoder 6', autoencoder_6.encoder)
+    plot_latent(craters_array_tensor[:300], 'dots', 'pca')
+    plot_latent(craters_array_tensor[:300], 'dots', 'tsne')
 
-    plot_latent(x_test_tensor[:300], 'imgs', 'autoencoder 2', autoencoder_2.encoder)
-    plot_latent(x_test_tensor[:300], 'imgs', 'autoencoder 6', autoencoder_6.encoder)
-    plot_latent(x_test_tensor[:300], 'imgs', 'pca')
-    plot_latent(x_test_tensor[:300], 'imgs', 'tsne')
+    plot_latent(craters_array_tensor[:300], 'imgs', 'autoencoder 2', autoencoder_2.encoder)
+    plot_latent(craters_array_tensor[:300], 'imgs', 'autoencoder 6', autoencoder_6.encoder)
+    plot_latent(craters_array_tensor[:300], 'imgs', 'pca')
+    plot_latent(craters_array_tensor[:300], 'imgs', 'tsne')
+
+    "Tagged craters"
 
     tagged_craters_images_dataset_folder = base_dir + "/tagged_craters"
     tagged_craters_img_paths = [os.path.join(tagged_craters_images_dataset_folder, f) for f in os.listdir(tagged_craters_images_dataset_folder)]
